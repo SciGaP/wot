@@ -1,0 +1,20 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <ul>
+      <li>
+        <a href="sponsor.html">Sponsor a new Applicant</a>
+      </li>
+      <li>
+        <a href="unsponsor.html">Remove endorsement of an Applicant</a>
+      </li>
+      <li>
+        <a href="uploadkey.html">Upload a new Sponsor key</a>
+      </li>
+      <li>
+        <a href="uploadsignedkey.html">Upload a signed Applicant key</a>
+      </li>
+    </ul>
+  </body>
+<html>

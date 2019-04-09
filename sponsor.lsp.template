@@ -1,0 +1,50 @@
+#!___NEWLISPPATH___
+(load "wot.lsp")
+(print "Content-type: text/html\n\n")
+
+(set (quote sponsoremail) (CGI:get "sponsoremail"))
+(set (quote applicantemail) (CGI:get "applicantemail"))
+(wot:checkemailaddress sponsoremail)
+(wot:checkemailaddress applicantemail)
+(wot:verifypassword sponsoremail (CGI:get "sponsorpassword"))
+
+(set (quote returnlist) (catch (wot:checktrust sponsoremail)))
+(if (= (nth 0 returnlist) nil)
+  (begin
+    (CGI:put-page "sponsoruntrusted.html")
+    (exit)
+  )
+)
+(set (quote sponsorsecretkeyids) (catch (wot:listkeys sponsoremail wot:PUBPUBKEYRING wot:SECSECKEYRING wot:SECTRUSTDB)))
+
+(set (quote applicantkeyids) (catch (wot:listkeys applicantemail wot:PUBPUBKEYRING wot:SECSECKEYRING wot:SECTRUSTDB)))
+(if (not applicantkeyids)
+  (begin
+    (set (quote applicantkeyids) (catch (wot:makekey applicantemail wot:PUBPUBKEYRING wot:SECSECKEYRING wot:SECTRUSTDB)))
+  )
+)
+
+(dolist (x sponsorsecretkeyids)
+  (begin
+    (dolist (y applicantkeyids)
+      (begin
+        ;(println "signing: " x " " y "<br>\n")
+        (set (quote signreturn) (catch (wot:signkey x y)))
+      )
+    )
+  )
+)
+
+(set (quote returnlist) (catch (wot:checktrust applicantemail)))
+(if (!= (nth 0 returnlist) nil)
+  (begin
+    (CGI:put-page "applicanttrusted.html")
+    (exit)
+  )
+  (begin
+    (CGI:put-page "applicanttrustfailed.html")
+    (exit)
+  )
+)
+(exit)
+

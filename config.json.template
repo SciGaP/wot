@@ -1,0 +1,234 @@
+{
+  "replacethese": [
+    { "placeholder": "___NEWLISPPATH___",
+      "replacement": "/opt/newlisp/install/bin/newlisp"
+    },
+    { "placeholder": "___NEWLISPMODULESPATH___",
+      "replacement": "/opt/newlisp/install/share/newlisp/modules"
+    },
+    { "placeholder": "___EXPECTPATH___",
+      "replacement": "/usr/bin/expect"
+    },
+    { "placeholder": "___EMAILPWQUERY___",
+      "replacement": "mysql"
+    },
+    { "placeholder": "___WOTSTARTEREMAIL___",
+      "replacement": "starter@example.com"
+    },
+    { "placeholder": "___MKTEMPPATH___",
+      "replacement": "/bin/mktemp"
+    },
+    { "placeholder": "___GPGPATH___",
+      "replacement": "/usr/local/bin/gpg"
+    },
+    { "placeholder": "___GPG2PATH___",
+      "replacement": "/usr/bin/gpg2"
+    },
+    { "placeholder": "___CURLPATH___",
+      "replacement": "/usr/bin/curl"
+    },
+    { "placeholder": "___KEYRINGDIRPATH___",
+      "replacement": "/opt/webot"
+    },
+    { "placeholder": "___CGIBINPATH___",
+      "replacement": "/opt/apache/var/www/cgi-bin"
+    },
+    { "placeholder": "___RELATIVECGIBINPATH___",
+      "replacement": "/cgi-bin/mmiller"
+    },
+    { "placeholder": "___SERVERURL___",
+      "replacement": "https://www.example.com:8000"
+    },
+    { "placeholder": "___HTMLPATH___",
+      "replacement": "/opt/apache/var/www/html"
+    },
+    { "placeholder": "___RELATIVEHTMLPATH___",
+      "replacement": "/html"
+    }
+  ],
+  "copythese": [
+    {
+      "comment": "These files should be placed in a directory not readable via the web server, matching ___KEYRINGDIRPATH___ above",
+      "destination": "/tmp/opt/webot",
+      "mode": 0700,
+      "files": [
+        { "name": "genkey.sec",
+          "mode": 0700
+        },
+        { "name": "listkey.sec",
+          "mode": 0700
+        },
+        { "name": "listkey.pub",
+          "mode": 0700
+        },
+        { "name": "input.genkey",
+          "mode": 0700
+        },
+        { "name": "signkey",
+          "mode": 0700
+        },
+        { "name": "trustkey",
+          "mode": 0700
+        },
+        { "name": "delsig.exp",
+          "mode": 0700
+        },
+        { "name": "tsign.exp",
+          "mode": 0700
+        },
+        { "name": "untrustkey.exp",
+          "mode": 0700
+        },
+        { "name": "checktrust.lsp",
+          "mode": 0700
+        },
+        { "name": "testit.lsp",
+          "mode": 0700
+        },
+        { "name": "importkey.sec",
+          "mode": 0700
+        },
+        { "name": "importkey.pub",
+          "mode": 0700
+        },
+        { "name": "deletekey.sec",
+          "mode": 0700
+        },
+        { "name": "deletekey.pub",
+          "mode": 0700
+        },
+        { "name": "pubkey.exported.alice",
+          "mode": 0600
+        },
+        { "name": "seckey.exported.alice",
+          "mode": 0600
+        },
+        { "name": "input.genkey.bob",
+          "mode": 0600
+        },
+        { "name": "input.genkey.charlie",
+          "mode": 0600
+        },
+        { "name": "input.sponsor",
+          "mode": 0600
+        },
+        { "name": "input.unsponsor",
+          "mode": 0600
+        },
+        { "name": "input.uploadkey",
+          "mode": 0600
+        },
+        { "name": "input.uploadsignedkey",
+          "mode": 0600
+        },
+        { "name": "input.sponsor.bad",
+          "mode": 0600
+        },
+        { "name": "input.unsponsor.bad",
+          "mode": 0600
+        },
+        { "name": "input.uploadkey.bad",
+          "mode": 0600
+        },
+        { "name": "input.uploadsignedkey.bad",
+          "mode": 0600
+        },
+        { "name": "readonly.template",
+          "mode": 0600
+        },
+        { "name": "users.json",
+          "mode": 0600
+        },
+        { "name": "gpgpassphrase.template",
+          "mode": 0600
+        }
+      ]
+    },
+    {
+      "comment": "These files should be placed under the cgi-bin directory of the web server",
+      "destination": "/tmp/opt/apache/var/www/cgi-bin",
+      "mode": 0755,
+      "files": [
+        { "name": "applicantnottrusted.html",
+          "mode": 0600
+        },
+        { "name": "applicanttrusted.html",
+          "mode": 0600
+        },
+        { "name": "applicanttrustfailed.html",
+          "mode": 0600
+        },
+        { "name": "emailmismatch.html",
+          "mode": 0600
+        },
+        { "name": "failsponsorkey.html",
+          "mode": 0600
+        },
+        { "name": "invalidemail.html",
+          "mode": 0600
+        },
+        { "name": "keyuploaded.html",
+          "mode": 0600
+        },
+        { "name": "sameemail.html",
+          "mode": 0600
+        },
+        { "name": "sponsoruntrusted.html",
+          "mode": 0600
+        },
+        { "name": "unpass.html",
+          "mode": 0600
+        },
+        { "name": "uploadfailed.html",
+          "mode": 0600
+        },
+        { "name": "unsponsor.lsp",
+          "mode": 0700
+        },
+        { "name": "sponsor.lsp",
+          "mode": 0700
+        },
+        { "name": "checktrust.lsp",
+          "mode": 0700
+        },
+        { "name": "uploadkey.lsp",
+          "mode": 0700
+        },
+        { "name": "uploadsignedkey.lsp",
+          "mode": 0700
+        },
+        { "name": "wotlocal.lsp",
+          "mode": 0700
+        },
+        { "name": "wot.lsp",
+          "mode": 0700
+        }
+      ]
+    },
+    {
+      "comment": "These files should be placed under the html directory of the web server",
+      "destination": "/tmp/opt/apache/var/www/html/mmiller",
+      "mode": 0755,
+      "files": [
+        { "name": "index.html",
+          "mode": 0700
+        },
+        { "name": "sponsor.html",
+          "mode": 0700
+        },
+        { "name": "checktrust.html",
+          "mode": 0700
+        },
+        { "name": "unsponsor.html",
+          "mode": 0700
+        },
+        { "name": "uploadkey.html",
+          "mode": 0700
+        },
+        { "name": "uploadsignedkey.html",
+          "mode": 0700
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+<html>
+  <head>
+    <title>
+      Unverified Password
+    </title>
+  </head>
+  <body>
+    <p>
+      Failed to verify password!
+    </p>
+    <a href="___RELATIVEHTMLPATH___index.html">Home</a>
+  </body>
+</html>

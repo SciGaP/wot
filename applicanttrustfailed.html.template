@@ -1,0 +1,13 @@
+<html>
+  <head>
+    <title>
+      Applicant Trust Failed
+    </title>
+  </head>
+  <body>
+    <p>
+      Applicant trust setting failed!
+    </p>
+    <a href="___RELATIVEHTMLPATH___index.html">Home</a>
+  </body>
+</html>

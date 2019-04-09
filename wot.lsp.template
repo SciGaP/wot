@@ -1,0 +1,488 @@
+#!___NEWLISPPATH___
+(context (quote wot))
+(set (quote TEMPDIR) "___KEYRINGDIRPATH___/tempdir")
+(set (quote MKTEMP) "___MKTEMPPATH___")
+(set (quote MYSQLACCESSFILE) "___KEYRINGDIRPATH___/readonly")
+(set (quote PASSPHRASEFILE) "___KEYRINGDIRPATH___/gpgpassphrase")
+;(set (quote SECPUBKEYRING) "___KEYRINGDIRPATH___/secpubring.gpg")
+(set (quote SECSECKEYRING) "___KEYRINGDIRPATH___/secsecring.gpg")
+(set (quote SECTRUSTDB) "___KEYRINGDIRPATH___/sectrustdb.gpg")
+(set (quote PUBPUBKEYRING) "___KEYRINGDIRPATH___/pubpubring.gpg")
+(set (quote PUBSECKEYRING) "___KEYRINGDIRPATH___/pubsecring.gpg")
+(set (quote PUBTRUSTDB) "___KEYRINGDIRPATH___/pubtrustdb.gpg")
+(if (!= (env "REQUEST_METHOD") nil)
+  (load "___NEWLISPMODULESPATH___/cgi.lsp")
+)
+(load "___NEWLISPMODULESPATH___/mysql.lsp")
+(load "___NEWLISPMODULESPATH___/crypto.lsp")
+(load "___CGIBINPATH___/wotlocal.lsp")
+; just about any character is allowd in email address.  Just needs 
+; a single @, 64 byte first part, 255 byte second part.
+; To send into gpg, single-quote it to prevent shell escape.
+(set (quote checkemailaddress)
+  (lambda (emailaddress)
+    (begin
+      (if (> (length emailaddress) 320)
+        (begin
+          (CGI:put-page "invalidemail.html")
+          (exit)
+        )
+      )
+      (set (quote partlist) (parse emailaddress "@"))
+      (if (> (length partlist) 2)
+        (begin
+          (CGI:put-page "invalidemail.html")
+          (exit)
+        )
+      )
+      (if (or (> (length (first partlist)) 64) (> (length (last partlist)) 255))
+        (begin
+          (CGI:put-page "invalidemail.html")
+          (exit)
+        )
+      )
+    )
+  )
+)
+(set (quote checkkey)
+  (lambda (targetkey "")
+    (begin
+      (if (regex "[^-a-zA-Z0-9/=+\n\s]+" targetkey)
+        (throw nil)
+        (throw true)
+      )
+    )
+  )
+)
+(set (quote runit)
+  (lambda (runstring inputstring timeout)
+    (begin
+      ;(println runstring)
+      ;(println inputstring)
+      (map set (quote (myin childout)) (pipe))
+      (map set (quote (childin myout)) (pipe))
+      (map set (quote (myerrin childerrout)) (pipe))
+      (set (quote childpid) (process runstring childin childout childerrout))
+      (if (string? inputstring)
+        (begin
+          (set (quote byteswritten) (write-line myout inputstring))
+        )
+      )
+      (close myout)
+      (close childin)
+      (set (quote childoutput) "")
+      (set (quote childerror) "")
+      (set (quote waits) 0)
+      (set (quote returnpid) 0)
+      (while (and (= returnpid 0) (< waits timeout))
+        (begin
+          (if (> (peek myerrin) 0)
+            (begin
+              (read myerrin myerrinbuffer (peek myerrin))
+              (set (quote childerror) (append childerror myerrinbuffer))
+            )
+          )
+          (if (> (peek myin) 0)
+            (begin
+              (read myin myinbuffer (peek myin))
+              (set (quote childoutput) (append childoutput myinbuffer))
+            )
+          )
+          (set (quote pidreturnlist) (wait-pid childpid nil))
+          (set (quote returnpid) (nth 0 pidreturnlist))
+          (sleep 1000)
+          (set (quote waits) (+ waits 1))
+        )
+      )
+      (if (= returnpid 0)
+        (begin
+          (print "timed out!")
+          (destroy childpid)
+        )
+      )
+      (throw (list (>> (nth 1 pidreturnlist) 8) childoutput childerror))
+    )
+  )
+)
+(set (quote trustkey)
+  (lambda ((keytotrust ""))
+    (begin
+      ; get long key id
+      (set (quote runstring) (string "___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --with-colons --keyring " PUBPUBKEYRING " --secret-keyring " PUBSECKEYRING " --trustdb-name " PUBTRUSTDB " --list-keys '" keytotrust "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (set (quote keyidlist) (list))
+      (set (quote keyid) nil)
+      (dolist (x (find-all {pub:\S:\d+:\d:([a-zA-Z0-9]{16}):\d\d\d\d-\d\d-\d\d} (nth 1 runitlist) $1))
+        (begin
+          (set (quote keyid) x)
+          (set (quote keyidlist) (append keyidlist (list keyid)))
+        )
+      )
+      (dolist (x keyidlist)
+        (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --with-colons --keyring " PUBPUBKEYRING " --secret-keyring " PUBSECKEYRING " --trustdb-name " PUBTRUSTDB " --trusted-key '" x "' --update-trustdb"))
+        (set (quote runitlist) (catch (runit runstring nil 20)))
+      )
+    )
+  )
+)
+(set (quote signkey)
+  (lambda ((sponsorkey "") (applicantkey ""))
+    (begin
+      (if (!= sponsorkey applicantkey)
+        (begin
+          (set (quote runstring) (string "___KEYRINGDIRPATH___/tsign.exp '" sponsorkey "' '" applicantkey "'"))
+          (set (quote runitlist) (catch (runit runstring nil 20)))
+          ; need to update pubtrustdb
+          (checktrustdb)
+        )
+      )
+    )
+  )
+)
+(set (quote checktrustdb)
+  (lambda ((pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb  " --check-trustdb" ))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (throw runitlist)
+    )
+  )
+)
+(set (quote gentestkey)
+  (lambda ((pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote runstring) (string "___GPG2PATH___ --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb  " --quick-gen-key noone@example.com" ))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (throw runitlist)
+    )
+  )
+)
+(set (quote listkeys)
+  (lambda ((userid "") (pubring PUBPUBKEYRING) (secring SECSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote runstring) (string "___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --list-keys '" userid "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (throw runitlist)
+    )
+  )
+)
+(set (quote importkey)
+  (lambda ((keyfile "") (pubring PUBPUBKEYRING) (secring SECSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --import " keyfile))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (throw runitlist)
+    )
+  )
+)
+(set (quote exportkey)
+  (lambda ((targetemail "") (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote runstring) (string MKTEMP " --tmpdir=" TEMPDIR))
+      (set (quote keyfile) (trim (nth 1 (catch (runit runstring nil 20)))))
+      (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --yes --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --output " keyfile " --export '" targetemail "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (throw keyfile)
+    )
+  )
+)
+(set (quote delsig)
+  (lambda ((sponsorkey "") (applicantkey ""))
+    (begin
+      (set (quote runstring) (string "___KEYRINGDIRPATH___/delsig.exp '" sponsorkey "' '" applicantkey "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+    )
+  )
+)
+(set (quote untrustkey)
+  (lambda ((targetkey "") )
+    (begin
+      (set (quote runstring) (string "___KEYRINGDIRPATH___/untrustkey.exp '" targetkey "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+    )
+  )
+)
+(set (quote listormakekey)
+  (lambda ((testemail "") (makeit nil) (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+      (begin
+        (set (quote keyidlist) (list))
+        (set (quote runstring) (string "___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --list-keys '" testemail "'"))
+        (set (quote runitlist) (catch (runit runstring nil 20)))
+        (write-file "t.out" (nth 1 runitlist))
+        (replace "<" (nth 1 runitlist) "&lt;")
+        (replace ">" (nth 1 runitlist) "&gt;")
+        ;(print "list-keys: <pre>" runitlist "</pre>")
+        (set (quote keyfound) nil)
+        (dolist (x (find-all (string "uid:.*(" testemail ").*") (nth 1 runitlist) $1 ))
+          (set (quote keyfound) x)
+        )
+        (if (= keyfound nil)
+          (begin
+            (if (!= makeit true)
+              (begin
+               (set (quote keyidlist) (list ()))
+              )
+              (begin
+                ;(print "not found, generating keypair for " testemail "<br>\n")
+                (set (quote gpgrunstring) (string "___GPGPATH___ --debug-level 8 --batch --no-default-keyring --passphrase-file " PASSPHRASEFILE " --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --gen-key"))
+                (set (quote gkeyinput) (string [text]Key-Type: RSA
+                Key-Length: 1024
+                Subkey-Type: ELG-E
+                Subkey-Length: 1024
+                Name-Real: WOT Admin
+                Name-Comment: WOT Signer
+                Name-Email: [/text] testemail "\n"
+                [text]Expire-Date: 0
+                %commit
+                %echo done
+                %exit
+                %done
+                %quit
+                missingcolonexit
+                [/text])
+                )
+                (set (quote runitlist) (catch (runit gpgrunstring gkeyinput 20)))
+                (set (quote keyid) nil)
+                (dolist (x (find-all {\ngpg: key (\S+) marked} (nth 2 runitlist) $1))
+                  (begin
+                    (set (quote keyid) x)
+                    ; trust newly made keys, since untrusted users will already
+                    ; have a key, so should not get here
+                    (set (quote keyidlist) (append keyidlist (list keyid)))
+                  )
+                )
+                ; check to make sure sponsor key got generated
+                (set (quote runstring) (string "___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " PUBPUBKEYRING " --secret-keyring " PUBSECKEYRING " --trustdb-name " PUBTRUSTDB " --list-keys '" testemail "'"))
+                (set (quote runitlist) (catch (runit runstring nil 20)))
+                (set (quote keyfound) nil)
+                (dolist (x (find-all (string "uid:.*(" testemail ").*") (nth 1 runitlist) $1 ))
+                  (set (quote keyfound) x)
+                )
+                (if (= keyfound nil)
+                  (begin
+                    (CGI:put-page "failsponsorkey.html")
+                    (exit)
+                  )
+                )
+              )
+          )
+        )
+        (begin
+          ; returned 0, so we found at least one key
+          (set (quote keyid) nil)
+          (dolist (x (find-all {pub:\S:\d+:\d:([a-zA-Z0-9]{16}):\d+:} (nth 1 runitlist) $1))
+            (begin
+              (set (quote keyid) x)
+              (set (quote keyidlist) (append keyidlist (list keyid)))
+            )
+          )
+        )
+      )
+      (throw keyidlist)
+    )
+  )
+)
+(set (quote makekey)
+  (lambda ((testemail "") (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote keyidlist) (list))
+      (set (quote gpgrunstring) (string "___GPGPATH___ --debug-level 8 --batch --no-default-keyring --passphrase-file " PASSPHRASEFILE " --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --gen-key"))
+      (set (quote gkeyinput) (string [text]Key-Type: RSA
+      Key-Length: 1024
+      Subkey-Type: ELG-E
+      Subkey-Length: 1024
+      Name-Real: WOT Admin
+      Name-Comment: WOT Signer
+      Name-Email: [/text] testemail "\n"
+      [text]Expire-Date: 0
+      %commit
+      %echo done
+      %exit
+      %done
+      %quit
+      missingcolonexit
+      [/text])
+      )
+      (set (quote runitlist) (catch (runit gpgrunstring gkeyinput 20)))
+      (set (quote keyid) nil)
+      (dolist (x (find-all {\ngpg: key (\S+) marked} (nth 2 runitlist) $1))
+        (begin
+          (set (quote keyid) x)
+          ; trust newly made keys, since untrusted users will already
+          ; have a key, so should not get here
+          (set (quote keyidlist) (append keyidlist (list keyid)))
+        )
+      )
+      ; check to make sure sponsor key got generated
+      (set (quote runstring) (string "___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " PUBPUBKEYRING " --secret-keyring " PUBSECKEYRING " --trustdb-name " PUBTRUSTDB " --list-keys '" testemail "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (set (quote keyfound) nil)
+      (dolist (x (find-all (string "uid:.*(" testemail ").*") (nth 1 runitlist) $1 ))
+        (set (quote keyfound) x)
+      )
+      (if (= keyfound nil)
+        (begin
+          (CGI:put-page "failsponsorkey.html")
+          (exit)
+        )
+        (begin
+          (throw keyidlist)
+        )
+      )
+    )
+  )
+)
+(set (quote listkeys)
+  (lambda ((testemail "") (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (set (quote keyidlist) (list))
+      (set (quote runstring) (string "___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --list-keys '" testemail "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (write-file "t.out" (nth 1 runitlist))
+      (replace "<" (nth 1 runitlist) "&lt;")
+      (replace ">" (nth 1 runitlist) "&gt;")
+      (set (quote keyfound) nil)
+      (dolist (x (find-all (string "uid:.*(" testemail ").*") (nth 1 runitlist) $1 ))
+        (set (quote keyfound) x)
+      )
+      (if (!= keyfound nil)
+        (begin
+          ; returned 0, so we found at least one key
+          (set (quote keyid) nil)
+          (dolist (x (find-all {pub:\S:\d+:\d:([a-zA-Z0-9]{16}):\d+:} (nth 1 runitlist) $1))
+            (begin
+              (set (quote keyid) x)
+              (set (quote keyidlist) (append keyidlist (list keyid)))
+            )
+          )
+        )
+      )
+      (throw keyidlist)
+    )
+  )
+)
+(set (quote checktrust)
+  (lambda ((testemail "") (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (if (empty? testemail) (throw (list nil (list))) )
+      (set (quote trustfound) nil)
+      (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " PUBPUBKEYRING " --secret-keyring " PUBSECKEYRING " --trustdb-name " PUBTRUSTDB " --check-sigs '" testemail "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (set (quote trustfound) nil)
+      ;(print "lines: (" (nth 1 runitlist) ")\n")
+      (setq signerslist (list))
+      (dolist (x (find-all {\npub:(\S)} (nth 1 runitlist) $1))
+        (begin
+          (if (ref x (quote ("f" "u")))
+            (set (quote trustfound) x)
+          )
+        )
+      )
+      (dolist (x (find-all {\nsig:\S*:\S*:\S*:\S*:\S*:\S*:.*:\S*:(.*):\S+:} (nth 1 runitlist) $1))
+        (begin
+          (if (find testemail x)
+            (begin
+              ; can't self-sponsor
+            )
+            (begin
+              ;(print "sponsored by: " x "\n")
+              (push x signerslist)
+            )
+          )
+        )
+      )
+      (throw (list trustfound signerslist))
+    )
+  )
+)
+(set (quote getsiginfo)
+  (lambda ((testemail "") (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (if (empty? testemail) (throw nil))
+      (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --check-sigs '" testemail "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (throw (nth 1 runitlist))
+    )
+  )
+)
+(set (quote getsigkeypairs)
+  (lambda ((sponsoremail "") (applicantemail "") (pubring PUBPUBKEYRING) (secring PUBSECRING) (trustdb PUBTRUSTDB))
+    (begin
+      (if (or (empty? sponsoremail) (empty? applicantemail)) (throw nil))
+      (set (quote runstring) (string "___GPGPATH___ --debug-level 8 --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring " pubring " --secret-keyring " secring " --trustdb-name " trustdb " --check-sigs '" applicantemail "'"))
+      (set (quote runitlist) (catch (runit runstring nil 20)))
+      (set (quote returnlist) (list))
+      (set (quote regexstring) (string "^(.*)$"))
+      (set (quote pubkeyid) nil)
+      (set (quote sigkeyid) nil)
+      (set (quote teststring) (copy (nth 1 runitlist)))
+      (replace "<" teststring "&lt;")
+      (replace ">" teststring "&gt;")
+      (dolist (linetext (find-all regexstring (nth 1 runitlist) $1 "m"))
+        (replace "<" linetext "&lt;")
+        (replace ">" linetext "&gt;")
+        (set (quote pubsubstring) (string "^(pub|sub):\\S:\\d+:\\d+:([a-zA-Z0-9]{16}):.*$"))
+        ;(println "pubstring: &gt;" pubstring "<br>\n")
+        (set (quote sigstring) (string "^sig:\\S::\\d+:([a-zA-Z0-9]{16}):.*" sponsoremail ".*$"))
+        ;(println "linetext: &gt;" linetext "&lt;<br>\n")
+        (set (quote foundpub) (regex pubsubstring linetext))
+        (if (!= foundpub nil)
+          (begin
+            ;(println "foundpub: &gt;" foundpub "&lt;<br>\n")
+            (set (quote pubkeyid) (nth 6 foundpub))
+          )
+          ;(begin
+          ;  (println "foundpub is nil <br>\n")
+          ;)
+        )
+        (set (quote foundsig) (regex sigstring linetext))
+        (if (and (!= foundsig nil) (!= pubkeyid (nth 3 foundsig)))
+          (begin
+            (set (quote sigkeyid) (nth 3 foundsig))
+            (set (quote returnlist) (append returnlist  (list (list pubkeyid sigkeyid))))
+            (set (quote foundsig) nil)
+          )
+        )
+      )
+      (throw returnlist)
+    )
+  )
+)
+
+(set (quote verifypassword)
+  (lambda ((sponsoremail "noone@example.com") (userpassword "userpassword"))
+    (begin
+      ;(println "(trim userpassword) &gt;" (trim userpassword) "&lt;<br>\n")
+      (set (quote usermd5password) (crypto:md5 (trim userpassword)))
+      ;(println "usermd5password &gt;" usermd5password "&lt;<br>\n")
+      (set (quote passwordverified) nil)
+      (if (= "___EMAILPWQUERY___" "mysql")
+        (set (quote emailpwquery) wotlocal:getemailpwsmysql)
+        (set (quote emailpwquery) wotlocal:getemailpwstextfile)
+      )
+      (map
+        (lambda (x)
+          (begin 
+            ;(print x "<br>")
+            (if (= (nth 1 x) usermd5password)
+              (begin
+                ;(print (nth 1 x) " matches " usermd5password " <br>")
+                (set (quote passwordverified) true)
+              )
+              (begin
+                ;(print (nth 1 x) " does not match " usermd5password " <br>")
+              )
+            )
+          )
+        )
+        (catch (emailpwquery sponsoremail))
+      )
+      (if (not passwordverified)
+        (begin
+          (CGI:put-page "unpass.html")
+          (exit)
+        )
+      )
+    )
+  )
+)

@@ -1,0 +1,13 @@
+<html>
+  <head>
+    <title>
+      Upload Failed
+    </title>
+  </head>
+  <body>
+    <p>
+      Key upload failed!
+    </p>
+    <a href="___RELATIVEHTMLPATH___index.html">Home</a>
+  </body>
+</html>

@@ -1,0 +1,60 @@
+(context (quote wotlocal))
+
+(set (quote getemailpwsmysql)
+  (lambda (sponsoremail "noone@example.com")
+    (begin
+      (MySQL:init)
+      (set (quote servportuserpassdbtable) (parse (read-file wot:MYSQLACCESSFILE) ":"))
+      (MySQL:connect)
+      (setf (nth 0 MySQL:connect) (quote (host user passw database port)))
+      (setf (nth 1 MySQL:connect) (quote (not(= (MySQL:mysql_real_connect MySQL:MYSQL host user passw database port 0 0) 0))))
+      (MySQL:connect (nth 0 servportuserpassdbtable) (nth 2 servportuserpassdbtable) (nth 3 servportuserpassdbtable) (trim (nth 4 servportuserpassdbtable)) (int (nth 1 servportuserpassdbtable)))
+      (set (quote sponsoremail) (MySQL:escape sponsoremail))
+      (set (quote sponsoremail) (trim sponsoremail))
+      (set (quote querystring) (append "SELECT email, password FROM " (nth 4 servportuserpassdbtable) "." (nth 5 servportuserpassdbtable) "t1 WHERE t1.email = '" sponsoremail "' LIMIT 50") )
+      (MySQL:query querystring)
+      (if
+        (and (!= (MySQL:num-rows) nil) (> (MySQL:num-rows) 0))
+        (begin
+          (set (quote emailpwlist) (MySQL:fetch-all))
+          (MySQL:close-db)
+          (throw emailpwlist)
+        )
+        (begin
+          (MySQL:close-db)
+          (throw (list))
+        )
+      )
+    )
+  )
+)
+
+(set (quote getemailpwstextfile)
+  (lambda (sponsoremail "noone@example.com")
+    (begin
+      (set (quote returnlist) (list))
+      (set (quote emailpwtext) (read-file "___KEYRINGDIRPATH___/users.json"))
+      (set (quote emailpwlist) (json-parse (read-file "___KEYRINGDIRPATH___/users.json")))
+      (if (= nil emailpwlist)
+        (begin
+          (print "json-error: " (json-error))
+        )
+      )
+      (map
+        (lambda (x)
+          (begin
+            (if (= sponsoremail (nth 0 x))
+              (begin
+                (set (quote returnlist) (append returnlist (list x)))
+              )
+              (begin
+              )
+            )
+          )
+        )
+        emailpwlist
+      )
+      (throw returnlist)
+    )
+  )
+)

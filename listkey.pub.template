@@ -1,0 +1,2 @@
+#!/bin/sh
+___GPGPATH___ --fixed-list-mode --with-fingerprint --with-fingerprint --batch --no-default-keyring --no-auto-key-locate --with-colons --keyring ___KEYRINGDIRPATH___/pubpubring.gpg --secret-keyring ___KEYRINGDIRPATH___/pubsecring.gpg --trustdb-name ___KEYRINGDIRPATH___/pubtrustdb.gpg --list-keys $@

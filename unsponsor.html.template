@@ -1,0 +1,18 @@
+<html>
+  <head>
+  </head>
+  <body>
+    <form method="POST" action="___RELATIVECGIBINPATH___/unsponsor.lsp">
+      Sponsor email:<br>
+      <input type="email" name="sponsoremail"><br>
+      Applicant email:<br>
+      <input type="email" name="applicantemail"><br>
+      Sponsor password:<br>
+      <input type="password" name="sponsorpassword"><br>
+      <input type="submit" value="Submit"><br>
+    </form>
+    <p>
+      <a href="index.html">Home</a>
+    </p>
+  </body>
+<html>

@@ -1,0 +1,32 @@
+#!___NEWLISPPATH___
+(load "wot.lsp")
+(print "Content-type: text/html\n\n")
+(set (quote sponsoremail) (CGI:get "sponsoremail"))
+(set (quote applicantemail) (CGI:get "applicantemail"))
+(wot:checkemailaddress sponsoremail)
+(wot:checkemailaddress applicantemail)
+(wot:verifypassword sponsoremail (CGI:get "sponsorpassword"))
+
+;(print "sponsoremail: " sponsoremail " applicantemail: " applicantemail "<br>\n")
+(set (quote pubsigkeypairs) (catch (wot:getsigkeypairs sponsoremail applicantemail wot:PUBPUBKEYRING wot:PUBSECKEYRING wot:PUBTRUSTDB)))
+;(print "pubsigkeypairs: " pubsigkeypairs "<br>\n")
+
+(dolist (keypair pubsigkeypairs)
+  (begin
+    ;(print "keypair: " keypair "<br>\n")
+    (set (quote signreturn) (catch (wot:delsig (nth 1 keypair) (nth 0 keypair))))
+    ;(print "signreturn: " signreturn "\n")
+  )
+)
+(set (quote returnlist) (catch (wot:checktrust applicantemail)))
+(if (!= (nth 0 returnlist) nil)
+  (begin
+    (CGI:put-page "applicanttrusted.html")
+    (exit)
+  )
+  (begin
+    (CGI:put-page "applicantnottrusted.html")
+    (exit)
+  )
+)
+(exit)

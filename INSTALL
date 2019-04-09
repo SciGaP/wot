@@ -1,0 +1,67 @@
+
+Prerequisites:
+/bin/sh
+curl (to run tests)
+gpg
+gpg2
+Create the file: ___KEYRINGDIRPATH___/gpgpassphrase to have a gpg
+passphrease to use with the gpg keyrings.
+expect
+newlisp
+database with a user table with email and md5 password for each user.
+This can be mysql or flat file, etc.  Modify code in config.json below
+to accommodate the local credential storage.  If MySQL is used, a
+file specifying server:port:ro-username:password:database:table
+is needed:  ___KEYRINGDIRPATH___/readonly
+
+Create a temp directory for importing keys:
+___KEYRINGDIRPATH___/tempdir
+
+Copy config.json.template to config.json and edit to local paths.
+wotlocal.jsp.template has a MySQL function, getemailpwsmysql, to specify
+query from a local database.  There is also a function, getemailpwstextfile,
+for reading username and passwords from a json text file. To select the
+MySQL function, use "mysql" in config.json.  Or anything else to pull
+from the users.json file.
+...
+    { "placeholder": "___EMAILPWQUERY___",
+      "replacement": "mysql"
+    },
+...
+
+Copy installit.lsp.template to installit.lsp.
+Put the correct path to newlisp into the first line of installit.lsp,
+and run it to install files to local paths, using config.json.
+
+To start the web of trust, generate a key for the origin sponsor email
+with pubpubring.gpg, secsecring.gpg, pubtrustdb.gpg.
+cd ___KEYRINGDIRPATH___
+./genkey.sec input.genkey
+
+Get the long key ID:
+./listkey.pub
+               long key ID
+             |<------------>|
+pub:-:1024:1:D67CE6C6D1F37FAC:1527280082:0::-:
+
+Trust the key:
+./trustkey D67CE6C6D1F37FAC
+
+Test keys have been included for alice@example.com, bob@example.com
+and charlie@example.com.  These can be used to test basic functionality.
+Copy users.json.template to users.json.  This is used for keeping
+usernames and encrypted passwords in a flat text file.  If mysql is
+used for usernames and encrypted passwords, then entries for the
+test users will be needed in the database.
+./testit.lsp
+sponsoring bob...
+PASS
+uploading bob's key...
+PASS
+responsoring bob to tsign the new key...
+uploading charlie's bob-signed key...
+PASS
+unsponsoring bob...
+PASS
+deleting keys for alice@example.com, bob@example.com, charlie@example.com
+

@@ -1,0 +1,38 @@
+#!newlisp
+(set (quote config) (json-parse (read-file "config.json")))
+(if (= config nil)
+  (begin
+    (println (json-error))
+    (exit)
+  )
+)
+(set (quote replacements) (lookup "replacethese" config))
+;(println "replacements: " replacements)
+(set (quote filesets) (lookup "copythese" config))
+;(println "filesets: " filesets)
+(dolist (fileset filesets)
+  (begin
+    (set (quote destination) (lookup "destination" fileset))
+    (if (not (directory? destination))
+      (begin
+        ;(println "make-dir " destination " " "(lookup \"mode\" fileset)")
+        (make-dir destination (lookup "mode" fileset))
+      )
+    )
+    (dolist (filespec (lookup "files" fileset))
+      (begin
+        (set (quote stringbuffer) (read-file (string (lookup "name" filespec) ".template")))
+        (dolist (replacement replacements)
+          (begin
+            (replace (lookup "placeholder" replacement) stringbuffer (lookup "replacement" replacement))
+          )
+        )
+        ;(println stringbuffer)
+        (write-file (string destination "/" (lookup "name" filespec)) stringbuffer)
+        (exec (string "chmod " (lookup "mode" filespec) " " destination "/" (lookup "name" filespec)))
+        ;(println "exec chmod " (lookup "mode" filespec) " " destination "/" (lookup "name" filespec))
+      )
+    )
+  )
+)
+(exit)

@@ -1,0 +1,3 @@
+#!/bin/sh
+___GPGPATH___ --with-colons --fixed-list-mode --with-fingerprint --with-fingerprint --no-default-keyring --no-auto-key-locate --keyring ___KEYRINGDIRPATH___/pubpubring.gpg --secret-keyring ___KEYRINGDIRPATH___/pubsecring.gpg --trustdb-name ___KEYRINGDIRPATH___/pubtrustdb.gpg --trusted-key $1 --update-trustdb
+

@@ -1,0 +1,13 @@
+<html>
+  <head>
+    <title>
+      Invalid Email Address
+    </title>
+  </head>
+  <body>
+    <p>
+      Failed to validate email address!
+    </p>
+    <a href="___RELATIVEHTMLPATH___index.html">Home</a>
+  </body>
+</html>
