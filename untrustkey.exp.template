@@ -80,7 +80,7 @@ pub:*:$targetkey:*\r
 gpg> "
 send -- "save\r"
 expect eof
-spawn ___GPGPATH___ --yes --with-colons --fixed-list-mode --with-fingerprint --with-fingerprint --no-default-keyring --no-auto-key-locate --keyring ___KEYRINGDIRPATH___/pubpubring.gpg --secret-keyring ___KEYRINGDIRPATH___/secsecring.gpg --trustdb-name ___KEYRINGDIRPATH___/sectrustdb.gpg --edit-key '$targetkey'
+spawn ___GPGPATH___ --homedir ___KEYRINGDIRPATH___ --yes --with-colons --fixed-list-mode --with-fingerprint --with-fingerprint --no-default-keyring --no-auto-key-locate --keyring ___KEYRINGDIRPATH___/pubpubring.gpg --secret-keyring ___KEYRINGDIRPATH___/secsecring.gpg --trustdb-name ___KEYRINGDIRPATH___/sectrustdb.gpg --edit-key '$targetkey'
 match_max 100000
 expect "*gpg> "
 send -- "trust\r"

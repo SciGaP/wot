@@ -46,13 +46,17 @@ if {$force_conservative} {
 
 
 set timeout 20
-spawn ___GPGPATH___ --yes --with-colons --fixed-list-mode --with-fingerprint --with-fingerprint --no-default-keyring --no-auto-key-locate --keyring ___KEYRINGDIRPATH___/pubpubring.gpg --secret-keyring ___KEYRINGDIRPATH___/secsecring.gpg --trustdb-name ___KEYRINGDIRPATH___/trustdb.gpg --local-user $sponsorkey --edit-key $applicantkey
+spawn ___GPGPATH___ --homedir ___KEYRINGDIRPATH___ --yes --with-colons --fixed-list-mode --with-fingerprint --with-fingerprint --no-default-keyring --no-auto-key-locate --keyring ___KEYRINGDIRPATH___/pubpubring.gpg --secret-keyring ___KEYRINGDIRPATH___/secsecring.gpg --trustdb-name ___KEYRINGDIRPATH___/pubtrustdb.gpg --local-user $sponsorkey --edit-key $applicantkey
 match_max 100000
 
 send_user "waiting for *Command> ...\n"
-expect -re ".*(gpg|)Command> "
+expect -re ".*(gpg|Command)> "
 send -- "tsign\r"
 expect {
+-re ".*No secret key.*
+.*(gpg|Command)> "
+{send -- "quit\r"
+}
 -re ".*secret key not available.*
 .*(gpg|Command)> "
 {send -- "quit\r"
@@ -75,6 +79,12 @@ send -- "\r"
 expect "*Really sign? (y/N) "
 send -- "y\r"
 expect -re "y.*
+.*
+(gpg|Command)> "
+send -- "trust\r"
+expect "*Your decision? "
+send -- "4\r"
+expect -re ".*
 .*
 (gpg|Command)> "
 send -- "save\r"

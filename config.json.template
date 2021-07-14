@@ -97,6 +97,12 @@
         { "name": "deletekey.pub",
           "mode": 0700
         },
+        { "name": "revsig.exp",
+          "mode": 0700
+        },
+        { "name": "plottrust.lsp",
+          "mode": 0700
+        },
         { "name": "pubkey.exported.alice",
           "mode": 0600
         },
@@ -131,6 +137,15 @@
           "mode": 0600
         },
         { "name": "input.uploadsignedkey.bad",
+          "mode": 0600
+        },
+        { "name": "input.checktrust.charlie",
+          "mode": 0600
+        },
+        { "name": "input.sponsor.charlie",
+          "mode": 0600
+        },
+        { "name": "input.unsponsor.charlie",
           "mode": 0600
         },
         { "name": "readonly.template",
